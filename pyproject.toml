@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling>=1.21.1", "hatch-vcs>=0.3"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fundingbot-sdk"
+dynamic = ["version"]
+description = "Публичные контракты (interfaces + dto) и toolkit для адаптеров бирж FundingBot"
+authors = [{ name = "Leontiy", email = "hatab200@gmail.com" }]
+requires-python = ">=3.12"
+readme = "README.md"
+license = { file = "LICENSE" }
+keywords = [
+  "fundingbot",
+  "crypto",
+  "ccxt",
+  "sdk",
+  "pydantic",
+  "typing",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+  "Framework :: AsyncIO",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "pydantic>=2.7",
+  "typing-extensions>=4.9",
+  "ccxt>=4.4.0",
+  "httpx>=0.25,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/fundingbot/fundingbot-sdk"
+Repository = "https://github.com/fundingbot/fundingbot-sdk"
+Issues = "https://github.com/fundingbot/fundingbot-sdk/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fundingbot_sdk"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/fundingbot_sdk/py.typed" = "fundingbot_sdk/py.typed"
+
+[tool.hatch.version]
+source = "vcs"
+tag-pattern = "fundingbot-sdk@(?P<version>.*)"
+
+[tool.semantic_release]
+tag_format = "fundingbot-sdk@{version}"
