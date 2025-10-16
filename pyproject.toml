@@ -9,7 +9,7 @@ description = "Публичные контракты (interfaces + dto) и toolk
 authors = [{ name = "Leontiy", email = "hatab200@gmail.com" }]
 requires-python = ">=3.12"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = { file = "LICENSE.md" }
 keywords = [
   "fundingbot",
   "crypto",
