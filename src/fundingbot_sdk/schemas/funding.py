@@ -1,7 +1,9 @@
+from collections.abc import Hashable
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import TypeGuard
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pdc_dataclass
 
 from fundingbot_sdk.schemas.base import ResponseBase
@@ -25,8 +27,31 @@ class FundingRateResponse(ResponseBase):
         description="Дата и время выплаты финансирования (ISO)"
     )
 
+    @staticmethod
+    def _is_dict(x: object) -> TypeGuard[dict[Hashable, object]]:
+        return isinstance(x, dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_input(cls, data: object) -> object:
+        if not cls._is_dict(data):
+            return data
+
+        d = dict(data)
+
+        ts = d.get("fundingTimestamp")
+        if ts is None:
+            ts = d.get("nextFundingTimestamp")
+
+        if ts is None:
+            msg = f"Отсутствует значение даты финансирования [nextFundingTimestamp, fundingTimestamp] raw:{data}"
+            raise ValueError(msg)
+
+        d["fundingTimestamp"] = ts
+        return d
+
     @field_validator("symbol", mode="before")
-    def _normalize_symbol(cls, v: str) -> str:  # noqa: D401, PLR6301
+    def _normalize_symbol(cls, v: str) -> str:
         """Приводит символ к виду BASE/USDT:USDT."""
         raw = str(v)
         if ":" in raw:
@@ -37,7 +62,7 @@ class FundingRateResponse(ResponseBase):
         return raw
 
     @field_validator("funding_date", mode="before")
-    def _to_datetime(cls, v: datetime | str | int) -> datetime:  # noqa: D401, PLR6301
+    def _to_datetime(cls, v: datetime | str | int) -> datetime:
         """Преобразует ISO или миллисекунды Unix к UTC‑aware datetime."""
         if isinstance(v, datetime):
             return v

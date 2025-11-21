@@ -10,6 +10,7 @@ import inspect
 import logging
 from dataclasses import dataclass
 from functools import wraps
+from threading import RLock
 from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, TypeVar, overload
 
 from fundingbot_sdk.contracts.ports.cex_client import CexIdentifiable
@@ -52,15 +53,26 @@ class ErrorMapper:
     def __init__(self) -> None:
         """Создать экземпляр маппера ошибок."""
         self._rules: list[Callable[[BaseException, ErrorContext], SdkError | None]] = []
+        self._rule_ids: set[tuple[str, str]] = set()
+        self._lock = RLock()
 
     def register(self, rule: Callable[[BaseException, ErrorContext], SdkError | None]) -> None:
-        """Зарегистрировать пользовательское правило маппинга."""
-        self._rules.append(rule)
+        """Регистрирует пользовательское правило маппинга."""
+        rule_id = self._rule_id(rule)
+
+        with self._lock:
+            if rule_id in self._rule_ids:
+                return
+            self._rules.append(rule)
+            self._rule_ids.add(rule_id)
 
     def translate(self, exc: BaseException, ctx: ErrorContext) -> SdkError:
         """Преобразовать исключение внешней библиотеки в SdkError."""
         # Пользовательские правила первыми
-        for rule in self._rules:
+        with self._lock:
+            rules_snapshot = tuple(self._rules)
+
+        for rule in rules_snapshot:
             mapped = rule(exc, ctx)
             if mapped is not None:
                 return self._enrich(mapped, ctx)
@@ -89,6 +101,12 @@ class ErrorMapper:
             err.symbol = ctx.symbol
             err.method = ctx.method
         return err
+
+    @staticmethod
+    def _rule_id(rule: Callable[[BaseException, ErrorContext], SdkError | None]) -> tuple[str, str]:
+        module = getattr(rule, "__module__", "")
+        qualname = getattr(rule, "__qualname__", getattr(rule, "__name__", ""))
+        return module, qualname
 
 
 default_error_mapper = ErrorMapper()
@@ -139,7 +157,8 @@ def _wrap_async[**P, R](fn: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[
         except Exception as exc:
             ctx = ErrorContext(exchange=exchange, symbol=symbol, method=method_name)
             logger.exception("Исключение на границе SDK: %s.%s", exchange, method_name)
-            raise default_error_mapper.translate(exc, ctx) from exc
+            t_ecx = default_error_mapper.translate(exc, ctx)
+            raise t_ecx from exc
 
     return wrapper
 

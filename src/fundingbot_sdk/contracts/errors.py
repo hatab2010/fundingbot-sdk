@@ -35,6 +35,8 @@ class ErrorCode(Enum):
     TRIGGER_ORDERS_UNAVAILABLE = "trigger_orders_unavailable"
     ORDER_UNAVAILABLE = "order_unavailable"
     BALANCE_UNAVAILABLE = "balance_unavailable"
+    FEE_UNAVAILABLE = "fee_unavailable",
+    CLOSE_POSITION_REPORT_UNAVAILABLE = "close_position_report_unavailable"
 
 
 @dataclass(slots=True, kw_only=True)
@@ -205,3 +207,38 @@ class OrderUnavailableError(ExchangeClientError):
     def __str__(self) -> str:
         """Вернуть человекочитаемое представление ошибки."""
         return f"Нет данных по ордеру для {self.symbol} на {self.exchange}"
+
+
+@dataclass(slots=True)
+class FeeUnavailableError(RetryableExchangeError):
+    """Отсутствуют корректные данные о комиссии."""
+
+    def __post_init__(self) -> None:
+        """Установить код ошибки для отсутствующей комиссии."""
+        self.error_code = ErrorCode.FEE_UNAVAILABLE
+
+    def __str__(self) -> str:
+        """Вернуть человекочитаемое представление ошибки."""
+        return f"Нет данных по комиссии для {self.symbol} на {self.exchange}"
+
+
+@dataclass(slots=True)
+class ClosePositionReportUnavailableError(RetryableExchangeError):
+    """Отсутствуют корректные данные о закрытой позиции."""
+
+    def __post_init__(self) -> None:
+        """Установить код ошибки для отсутствующей закрытой позиции."""
+        self.error_code = ErrorCode.CLOSE_POSITION_REPORT_UNAVAILABLE
+
+    def __str__(self) -> str:
+        """Вернуть человекочитаемое представление ошибки."""
+        return f"Нет данных по закрытой позиции для {self.symbol} на {self.exchange}"
+
+
+@dataclass(slots=True)
+class AlreadyConfiguredError(PermanentExchangeError):
+    """Сообщает, что запрошенный режим уже установлен."""
+
+    def __post_init__(self) -> None:
+        """Установить код ошибки EXCHANGE_ERROR."""
+        self.error_code = ErrorCode.EXCHANGE_ERROR

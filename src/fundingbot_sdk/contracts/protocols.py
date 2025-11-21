@@ -39,7 +39,7 @@ class PositionProtocol(Protocol):
         ...
 
     @property
-    def collateral(self) -> Decimal:
+    def collateral(self) -> Decimal | None:
         """Залог (маржа), выделенный под позицию."""
         ...
 
@@ -59,7 +59,7 @@ class PositionProtocol(Protocol):
         ...
 
     @property
-    def hedged(self) -> bool:
+    def hedged(self) -> bool | None:
         """Флаг хеджированного режима (dual‑side)."""
         ...
 
@@ -82,7 +82,7 @@ class PositionProtocol(Protocol):
         ...
 
     @property
-    def liquidation_price(self) -> Decimal:
+    def liquidation_price(self) -> Decimal | None:
         """Цена ликвидации позиции."""
         ...
 

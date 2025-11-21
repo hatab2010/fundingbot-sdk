@@ -14,13 +14,13 @@ class PositionInfoResponse(ResponseBase):
 
     timestamp: int = Field(..., description="Метка времени (мс)", validation_alias="timestamp")
     symbol: str = Field(..., description="Символ инструмента", validation_alias="symbol")
-    collateral: Decimal = Field(..., description="Залог", validation_alias="collateral")
+    collateral: Decimal | None = Field(None, description="Залог", validation_alias="collateral")
     contracts: Decimal = Field(..., description="Количество контрактов", validation_alias="contracts")
     datetime: dt = Field(..., description="Время в ISO", validation_alias="datetime")
     entry_price: Decimal = Field(..., description="Цена входа", validation_alias="entryPrice")
-    hedged: bool = Field(..., description="Хеджированный режим", validation_alias="hedged")
+    hedged: bool | None = Field(None, description="Хеджированный режим", validation_alias="hedged")
     leverage: Decimal = Field(..., description="Кредитное плечо", validation_alias="leverage")
-    liquidation_price: Decimal = Field(..., description="Цена ликвидации", validation_alias="liquidationPrice")
+    liquidation_price: Decimal|None = Field(None, description="Цена ликвидации", validation_alias="liquidationPrice")
     notional: Decimal = Field(..., description="Нотиональная стоимость", validation_alias="notional")
     side: str = Field(..., description="Направление", validation_alias="side")
     margin_mode: str | None = Field(default=None, description="Режим маржи", validation_alias="marginMode")
@@ -43,7 +43,6 @@ class CCXTPositionInfoResponse(PositionInfoResponse):
     """Снимок позиции ccxt с нормализацией полей источника.
 
     Контракт совпадает с ``PositionInfoResponse``. Дополнительно нормализуются:
-    - ``id`` приводится к ``str`` при наличии;
     - при отсутствии ``timestamp`` и ``datetime`` используются значения из ``info.updateTime`` (мс, UTC);
     - допускается строковый ``datetime`` (ISO 8601), который будет разобран Pydantic.
     """
@@ -70,11 +69,6 @@ class CCXTPositionInfoResponse(PositionInfoResponse):
             return data
 
         item: dict[str, Any] = dict(cast("dict[str, Any]", data))
-
-        # Привести id к строке при наличии
-        id_value = item.get("id")
-        if id_value is not None and not isinstance(id_value, str):
-            item["id"] = str(id_value)
 
         # Заполнить timestamp/datetime из info.updateTime, если оба отсутствуют
         if item.get("timestamp") is None and item.get("datetime") is None:
