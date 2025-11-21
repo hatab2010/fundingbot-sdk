@@ -42,15 +42,6 @@ from fundingbot_sdk.schemas.position_info import CCXTPositionInfoResponse
 from fundingbot_sdk.schemas.ticker import TickerResponse
 from fundingbot_sdk.toolkit.error_mapper import map_sdk_errors
 
-TICKER_RESPONSE_ADAPTER = TypeAdapter(TickerResponse)
-CCXT_POSITION_INFO_ADAPTER = TypeAdapter(CCXTPositionInfoResponse)
-MARKET_RESPONSE_ADAPTER = TypeAdapter(MarketResponse)
-TRIGGER_ORDER_LIST_ADAPTER = TypeAdapter(list[TriggerOrderResponse])
-FUNDING_RATE_RESPONSE_ADAPTER = TypeAdapter(FundingRateResponse)
-CREATE_ORDER_RESPONSE_ADAPTER = TypeAdapter(CreateOrderResponse)
-BALANCE_RESPONSE_ADAPTER = TypeAdapter(BalanceResponse)
-
-
 if TYPE_CHECKING:
     from fundingbot_sdk.contracts.ports.cex_client import CexClientConfig
     from fundingbot_sdk.contracts.ports.rate_limiter import RateLimiterPort, RateLimitPermitProtocol
@@ -128,6 +119,14 @@ class CcxtClient(CexClientPort):
     асинхронный rate‑лимитер для учёта веса запросов.
     """
 
+    _ticker_response_adapter = TypeAdapter(TickerResponse)
+    _position_info_adapter = TypeAdapter(CCXTPositionInfoResponse)
+    _market_response_adapter = TypeAdapter(MarketResponse)
+    _trigger_order_list_adapter = TypeAdapter(list[TriggerOrderResponse])
+    _funding_rate_response_adapter = TypeAdapter(FundingRateResponse)
+    _create_order_response_adapter = TypeAdapter(CreateOrderResponse)
+    _balance_response_adapter = TypeAdapter(BalanceResponse)
+
     def __init__(self, exchange_name: str, config: CexClientConfig, *, verbose: bool = False) -> None:
         """Инициализировать клиента ccxt.
 
@@ -189,7 +188,7 @@ class CcxtClient(CexClientPort):
     async def get_ticker(self, symbol: str) -> TickerProtocol:
         data = await self._exchange.fetch_ticker(symbol)
         try:
-            dto = TICKER_RESPONSE_ADAPTER.validate_python(data)
+            dto = self._ticker_response_adapter.validate_python(data)
         except ValidationError as e:
             raise TickerUnavailableError(symbol=symbol, exchange=self.cex_id) from e
         return dto
@@ -202,15 +201,16 @@ class CcxtClient(CexClientPort):
         params: dict[str, Any] | None = None
     ) ->  Sequence[PositionProtocol]:
         data = await self._exchange.fetch_positions(symbols=symbols, params=params or {})
+
         filtered: list[CCXTPositionInfoResponse] = []
         for item in data:
+            if item.get("contracts") == 0 or item.get("side") is None:
+                continue
             try:
-                position = CCXT_POSITION_INFO_ADAPTER.validate_python(item)
+                position = self._position_info_adapter.validate_python(item)
             except ValidationError as e:
                 raise PositionUnavailableError(symbol=item.get("symbol"), exchange=self.cex_id) from e
 
-            if position.contracts == 0:  # Некоторые биржи возвращают нулевые позиции, поэтому их нужно фильтровать.
-                continue
             filtered.append(position)
 
         return filtered
@@ -231,7 +231,7 @@ class CcxtClient(CexClientPort):
             raise InstrumentUnavailableError(symbol=symbol, exchange=self.cex_id)
         dto_dict = {**data, "symbol": symbol}
         try:
-            dto = MARKET_RESPONSE_ADAPTER.validate_python(dto_dict)
+            dto = self._market_response_adapter.validate_python(dto_dict)
         except ValidationError as e:
             raise InstrumentUnavailableError(symbol=symbol, exchange=self.cex_id) from e
 
@@ -242,7 +242,7 @@ class CcxtClient(CexClientPort):
     async def get_trigger_orders(self, symbol: str) -> Sequence[TriggerOrderProtocol]:
         tpsl_orders = await self._exchange.fetch_open_orders(symbol=symbol, params={"planType": "profit_loss"})
         try:
-            return TRIGGER_ORDER_LIST_ADAPTER.validate_python(tpsl_orders)
+            return self._trigger_order_list_adapter.validate_python(tpsl_orders)
         except ValidationError as e:
             raise TriggerOrdersUnavailableError(symbol=symbol, exchange=self.cex_id) from e
 
@@ -252,7 +252,7 @@ class CcxtClient(CexClientPort):
         await self.load_markets()
         data = await self._exchange.fetch_funding_rate(symbol)
         try:
-            dto = FUNDING_RATE_RESPONSE_ADAPTER.validate_python(data)
+            dto = self._funding_rate_response_adapter.validate_python(data)
         except ValidationError as e:
             raise FundingRateUnavailableError(symbol=symbol, exchange=self.cex_id) from e
 
@@ -283,7 +283,7 @@ class CcxtClient(CexClientPort):
 
             payload = {**raw, "symbol": symbol, "exchange": self.cex_id}
             try:
-                dto = FUNDING_RATE_RESPONSE_ADAPTER.validate_python(payload)
+                dto = self._funding_rate_response_adapter.validate_python(payload)
             except ValidationError as e:
                 raise FundingRateUnavailableError(symbol=symbol, exchange=self.cex_id) from e
 
@@ -346,7 +346,7 @@ class CcxtClient(CexClientPort):
             },
         )
         try:
-            return CREATE_ORDER_RESPONSE_ADAPTER.validate_python(data)
+            return self._create_order_response_adapter.validate_python(data)
         except ValidationError as e:
             raise OrderUnavailableError(symbol=symbol, exchange=self.cex_id) from e
 
@@ -368,7 +368,7 @@ class CcxtClient(CexClientPort):
             symbol=symbol, type=order_type, side=side, amount=amount, price=price, params=params
         )
         try:
-            return CREATE_ORDER_RESPONSE_ADAPTER.validate_python(data)
+            return self._create_order_response_adapter.validate_python(data)
         except ValidationError as e:
             raise OrderUnavailableError(symbol=symbol, exchange=self.cex_id) from e
 
@@ -386,7 +386,7 @@ class CcxtClient(CexClientPort):
         if s_balance is None:
             return BalanceResponse(free=Decimal(0), used=Decimal(0), total=Decimal(0))
         try:
-            return BALANCE_RESPONSE_ADAPTER.validate_python(s_balance)
+            return self._balance_response_adapter.validate_python(s_balance)
         except ValidationError as e:
             raise BalanceUnavailableError(symbol=coin, exchange=self.cex_id) from e
 
